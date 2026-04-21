@@ -55,7 +55,7 @@ def build_prompt(words: list[dict[str, Any]], article_date: str) -> str:
         "5. After each English paragraph, provide a fluent Chinese translation rather than a word-by-word translation.\n"
         "6. Keep each article coherent, specific, and readable, as if it were a short magazine passage.\n"
         "7. Do not force every word into one scene. If needed, distribute the words across multiple articles instead of dropping too many words.\n"
-        "8. End with a short vocabulary recap table with columns: Word | Meaning. If there are multiple articles, provide one combined recap table at the end.\n"
+        "8. End with a short vocabulary recap table with columns: Word | Meaning | How it was used. If there are multiple articles, provide one combined recap table at the end.\n"
         f"{missing_note}"
         "Vocabulary:\n"
         + "\n".join(vocabulary_lines)
