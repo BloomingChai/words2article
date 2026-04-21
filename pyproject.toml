@@ -1,0 +1,8 @@
+[project]
+name = "momo-daily-writer"
+version = "0.1.0"
+description = "Generate a bilingual daily article from momo study words and a custom LLM."
+requires-python = ">=3.11"
+
+[project.scripts]
+momo-writer = "momo.app:main"
