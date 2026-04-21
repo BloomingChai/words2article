@@ -50,7 +50,7 @@
 python3 -m momo
 ```
 
-默认会排除 `first_response=WELL_FAMILIAR` 的单词，也就是你当天标记为“非常熟悉”的词。
+默认会请求当天的新学单词，并保留 `FAMILIAR`、`VAGUE`、`FORGET` 等单词，只排除 `first_response=WELL_FAMILIAR` 的词，也就是你当天标记为“非常熟悉”的词。
 如果你想把这些词也包含进来，可以加上：
 
 ```bash
@@ -69,6 +69,12 @@ python3 -m momo words
 python3 -m momo generate --force
 ```
 
+只基于当天缓存重新请求 LLM，不重新拉取单词：
+
+```bash
+python3 -m momo regenerate
+```
+
 只打印，不写入输出文件：
 
 ```bash
@@ -78,16 +84,19 @@ python3 -m momo today --stdout-only
 ## 输出
 
 - 文章默认写入 `output/YYYY-MM-DD.md`
+- 同时会额外同步一份到 `/Users/chai/Documents/Obsidian Vault/words2article/YYYY-MM-DD.md`
 - 缓存默认写入 `cache/`
   - `YYYY-MM-DD-today-items.json`
   - `YYYY-MM-DD-words.json`
   - `YYYY-MM-DD-prompt.txt`
   - `word_supplements.json`
 
+`regenerate` 会优先复用 `YYYY-MM-DD-words.json` 和 `YYYY-MM-DD-prompt.txt`，因此更适合反复测试模型输出效果。
+
 ## 说明
 
 - 当前版本只按 `voc_spelling` 做精确匹配和大小写归一化匹配。
-- 新词库会优先读取 `definitions` 和 `examples` 字段，并在内部转换成统一结构。
+- 当前版本只支持 `momowords.core.json` 这套词库结构，读取 `definitions` 和 `examples` 字段。
 - 如果词书中缺少某个单词，工具仍会继续生成文章，但会提示模型谨慎使用该词。
 - 如果当天墨墨接口没有返回新词，工具会直接提示并退出。
 

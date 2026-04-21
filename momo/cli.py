@@ -20,11 +20,11 @@ def parse_args() -> argparse.Namespace:
         "command",
         nargs="?",
         default="today",
-        choices=["today", "generate", "words"],
-        help="today/show today's article, generate a fresh one, or only list today's words",
+        choices=["today", "generate", "regenerate", "words"],
+        help="today/show today's article, generate a fresh one, regenerate from cache, or only list today's words",
     )
     parser.add_argument("--date", default=date.today().isoformat(), help="Date in YYYY-MM-DD")
-    parser.add_argument("--limit", type=int, default=50, help="Max words requested from Momo")
+    parser.add_argument("--limit", type=int, default=1000, help="Max words requested from Momo")
     parser.add_argument(
         "--include-well-familiar",
         action="store_true",

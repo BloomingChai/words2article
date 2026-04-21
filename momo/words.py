@@ -8,11 +8,23 @@ from pathlib import Path
 from typing import Any
 
 
+LEADING_INDEX_PATTERN = re.compile(r"^\s*(\d+)\s+(.+?)\s*$")
+
+
 def normalize_word(word: str) -> str:
     """把单词做统一归一化，方便匹配。"""
     cleaned = word.strip().lower()
     cleaned = re.sub(r"^[^a-z0-9]+|[^a-z0-9]+$", "", cleaned)
     return " ".join(cleaned.split())
+
+
+def clean_word_text(word: str) -> str:
+    """清理词库中被索引号污染的 word 字段。"""
+    cleaned = word.strip()
+    match = LEADING_INDEX_PATTERN.match(cleaned)
+    if match:
+        return match.group(2).strip()
+    return cleaned
 
 
 def split_definition_text(text: str) -> list[dict[str, str]]:
@@ -35,56 +47,37 @@ def split_definition_text(text: str) -> list[dict[str, str]]:
     return [{"type": part_of_speech, "translation": piece} for piece in pieces]
 
 
-def normalize_examples(examples: Any) -> list[dict[str, str]]:
-    normalized = []
-    if not isinstance(examples, list):
-        return normalized
+def is_usable_example(entry: Any) -> bool:
+    if not isinstance(entry, dict):
+        return False
 
-    for entry in examples[:3]:
-        if not isinstance(entry, dict):
-            continue
-        phrase = str(entry.get("en", "")).strip()
-        translation = str(entry.get("zh", "")).strip()
-        if not phrase or not translation:
-            continue
-        normalized.append({"phrase": phrase, "translation": translation})
-    return normalized
+    phrase = str(entry.get("en", "")).strip()
+    translation = str(entry.get("zh", "")).strip()
+    if len(phrase) < 3 or len(translation) < 2:
+        return False
+    if not re.search(r"[A-Za-z]", phrase):
+        return False
+    if phrase in {"/", "-"} or translation in {"/", "-"}:
+        return False
+    return True
 
 
 def normalize_word_entry(item: dict[str, Any]) -> dict[str, Any]:
-    """兼容旧词库和新的 Momo words 词库结构。"""
+    """把 Momo words 词库条目转成项目内部使用的统一结构。"""
     translations = []
-    raw_translations = item.get("translations")
-    if isinstance(raw_translations, list):
-        translations = [
-            {
-                "type": str(entry.get("type", "")).strip(),
-                "translation": str(entry.get("translation", "")).strip(),
-            }
-            for entry in raw_translations
-            if isinstance(entry, dict) and str(entry.get("translation", "")).strip()
-        ]
-    else:
-        raw_definitions = item.get("definitions")
-        if isinstance(raw_definitions, list):
-            for definition in raw_definitions:
-                translations.extend(split_definition_text(str(definition)))
+    for definition in item.get("definitions", []):
+        translations.extend(split_definition_text(str(definition)))
 
-    raw_phrases = item.get("phrases")
-    if isinstance(raw_phrases, list):
-        phrases = [
-            {
-                "phrase": str(entry.get("phrase", "")).strip(),
-                "translation": str(entry.get("translation", "")).strip(),
-            }
-            for entry in raw_phrases[:3]
-            if isinstance(entry, dict) and str(entry.get("phrase", "")).strip()
-        ]
-    else:
-        phrases = normalize_examples(item.get("examples"))
+    phrases = []
+    for entry in item.get("examples", [])[:3]:
+        if not is_usable_example(entry):
+            continue
+        phrase = str(entry.get("en", "")).strip()
+        translation = str(entry.get("zh", "")).strip()
+        phrases.append({"phrase": phrase, "translation": translation})
 
     return {
-        "word": str(item.get("word", "")).strip(),
+        "word": clean_word_text(str(item.get("word", ""))),
         "translations": translations[:6],
         "phrases": phrases,
     }
@@ -116,14 +109,7 @@ def enrich_words(
     enriched = []
     for item in sorted(items, key=lambda value: value.get("order", 0)):
         word = str(item.get("voc_spelling", "")).strip()
-        normalized = normalize_word(word)
-        word_entry = word_index.get(normalized)
-
-        translations = []
-        phrases = []
-        if word_entry:
-            translations = word_entry.get("translations", []) or []
-            phrases = word_entry.get("phrases", []) or []
+        word_entry = word_index.get(normalize_word(word))
 
         enriched.append(
             {
@@ -135,22 +121,8 @@ def enrich_words(
                 "is_finished": item.get("is_finished"),
                 "matched": bool(word_entry),
                 "source": "word_book" if word_entry else "unmatched",
-                "translations": [
-                    {
-                        "type": entry.get("type", ""),
-                        "translation": str(entry.get("translation", "")).strip(),
-                    }
-                    for entry in translations
-                    if isinstance(entry, dict) and str(entry.get("translation", "")).strip()
-                ],
-                "phrases": [
-                    {
-                        "phrase": str(entry.get("phrase", "")).strip(),
-                        "translation": str(entry.get("translation", "")).strip(),
-                    }
-                    for entry in phrases[:3]
-                    if isinstance(entry, dict) and str(entry.get("phrase", "")).strip()
-                ],
+                "translations": word_entry.get("translations", []) if word_entry else [],
+                "phrases": word_entry.get("phrases", []) if word_entry else [],
             }
         )
     return enriched

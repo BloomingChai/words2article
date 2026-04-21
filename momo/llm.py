@@ -8,9 +8,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+import sys
 
 from .config import AppConfig
-from .http import post_json, unwrap_api_data
+from .http import post_json, stream_json_events, unwrap_api_data
 from .words import normalize_word
 
 
@@ -143,7 +144,7 @@ def generate_article(config: AppConfig, prompt: str) -> str:
     }
     payload = {
         "model": config.llm_model,
-        "stream": False,
+        "stream": True,
         "messages": [
             {
                 "role": "system",
@@ -152,12 +153,27 @@ def generate_article(config: AppConfig, prompt: str) -> str:
             {"role": "user", "content": prompt},
         ],
     }
-    response = post_json(config.llm_url, payload, headers, config.timeout)
-    choices = response.get("choices") or []
-    if not choices:
-        raise SystemExit("LLM response did not contain choices")
-    message = choices[0].get("message") or {}
-    content = message.get("content")
-    if not content:
-        raise SystemExit("LLM response did not contain message content")
-    return str(content).strip()
+    chunks: list[str] = []
+    saw_content = False
+
+    for event in stream_json_events(config.llm_url, payload, headers, config.timeout):
+        choices = event.get("choices") or []
+        if not choices:
+            continue
+        delta = choices[0].get("delta") or {}
+        content = delta.get("content")
+        if not content:
+            continue
+        saw_content = True
+        text = str(content)
+        chunks.append(text)
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+    if saw_content:
+        if not chunks[-1].endswith("\n"):
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+        return "".join(chunks).strip()
+
+    raise SystemExit("LLM stream did not contain content")

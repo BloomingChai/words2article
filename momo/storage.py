@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,17 +22,31 @@ def cache_payload(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def load_cached_payload(path: Path) -> Any | None:
+    """读取缓存 JSON；文件不存在时返回 None。"""
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_cached_text(path: Path) -> str | None:
+    """读取缓存文本；文件不存在时返回 None。"""
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8")
+
+
 def write_article(path: Path, article: str) -> None:
     """把文章文本写到指定文件。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(article + "\n", encoding="utf-8")
 
 
-def build_front_matter(words: list[dict[str, Any]], article_date: str) -> str:
-    """为文章生成简单的头部注释信息。"""
-    used_words = ", ".join(item["word"] for item in words[:12])
-    return (
-        f"<!-- generated_at: {datetime.now().isoformat(timespec='seconds')} -->\n"
-        f"<!-- article_date: {article_date} -->\n"
-        f"<!-- source_words: {used_words} -->\n\n"
-    )
+def write_article_copies(paths: list[Path], article: str) -> None:
+    """把同一篇文章写到多个目标路径。"""
+    seen: set[Path] = set()
+    for path in paths:
+        if path in seen:
+            continue
+        write_article(path, article)
+        seen.add(path)
